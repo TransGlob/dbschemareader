@@ -27,7 +27,7 @@ namespace DatabaseSchemaReader.CodeGen
                     name = name.Substring(0, name.Length - 2);
                 }
                 //member name cannot be same as class name
-                if (name == column.Table.NetName)
+                if (name == column.Table?.NetName)
                 {
                     name += "Property";
                 }
@@ -142,7 +142,7 @@ namespace DatabaseSchemaReader.CodeGen
             var fksToTarget = table.ForeignKeys.Where(x => x.RefersToTable == targetTable).ToList();
             string name = table.NetName;
             if (fksToTarget.Count > 1)
-                name = string.Join("", foreignKey.Columns.Select(x => table.FindColumn(x).NetName).ToArray());
+                name += string.Join("", foreignKey.Columns.Select(x => table.FindColumn(x).NetName).ToArray());
 
             return NameCollection(name);
         }

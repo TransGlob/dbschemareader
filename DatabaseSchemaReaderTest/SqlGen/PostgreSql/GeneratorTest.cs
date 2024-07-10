@@ -21,8 +21,8 @@ namespace DatabaseSchemaReaderTest.SqlGen.PostgreSql
                 .AddColumn<int>("Period")
                 .Table;
             var column = table.FindColumn("Name");
-            table.AddIndex("TableIndex", new[] {column});
-            table.Indexes.Find(i=> i.Name =="TableIndex").IsUnique = true;
+            table.AddIndex("TableIndex", new[] { column });
+            table.Indexes.Find(i => i.Name == "TableIndex").IsUnique = true;
             table.Description = "Test table";
             column.Description = "Name column";
 
@@ -36,6 +36,34 @@ namespace DatabaseSchemaReaderTest.SqlGen.PostgreSql
             //assert
             Assert.IsTrue(ddl.Contains("CREATE UNIQUE INDEX TableIndex ON AllTypes(Name)"));
             Assert.IsTrue(ddl.Contains("COMMENT ON COLUMN AllTypes.Name IS 'Name column';"));
+        }
+
+        [TestMethod]
+        public void TestGeneratorPartialIndex()
+        {
+            //arrange
+            var schema = new DatabaseSchema(null, SqlType.PostgreSql);
+            var table = schema.AddTable("AllTypes")
+                .AddColumn<int>("Id").AddIdentity().AddPrimaryKey("PK")
+                .AddColumn<string>("Name").AddLength(200)
+                .AddColumn<int>("Age")
+                .AddColumn<int>("Period")
+                .Table;
+            var column = table.FindColumn("Name");
+            table.AddIndex("TableIndex", new[] { column });
+            table.Indexes.Find(i => i.Name == "TableIndex").Filter = "\"Age\" IS NOT NULL";
+            table.Description = "Test table";
+            column.Description = "Name column";
+
+            var factory = new DdlGeneratorFactory(SqlType.PostgreSql);
+            var tableGen = factory.TableGenerator(table);
+            tableGen.EscapeNames = false;
+
+            //act
+            var ddl = tableGen.Write();
+
+            //assert
+            Assert.IsTrue(ddl.Contains("CREATE INDEX TableIndex ON AllTypes(Name) WHERE \"Age\" IS NOT NULL;"));
         }
 
         [TestMethod]
@@ -75,7 +103,30 @@ namespace DatabaseSchemaReaderTest.SqlGen.PostgreSql
             var ddl = tableGen.Write();
             //assert
             Assert.IsTrue(ddl.Contains("CREATE INDEX \"idx_fk_country_id\" ON \"public\".\"city\"(\"country_id\");"));
+        }
 
+        [TestMethod]
+        public void TestDefaultValueEscaping()
+        {
+            //arrange
+            var schema = new DatabaseSchema(null, SqlType.PostgreSql);
+            var table = schema.AddTable("AllTypes")
+                .AddColumn<int>("Id").AddIdentity().AddPrimaryKey("PK")
+                .AddColumn<string>("Format")
+                .Table;
+            var column = table.FindColumn("Format");
+            column.DbDataType = "Text";
+            column.DefaultValue = "'HH:mm'::text";
+
+            var factory = new DdlGeneratorFactory(SqlType.PostgreSql);
+            var tableGen = factory.TableGenerator(table);
+            tableGen.EscapeNames = false;
+
+            //act
+            var ddl = tableGen.Write();
+
+            //assert
+            Assert.IsTrue(ddl.Contains("DEFAULT 'HH:mm'::text"));
         }
     }
 }

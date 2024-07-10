@@ -1,14 +1,15 @@
-﻿using System;
+﻿using DatabaseSchemaReader.DataSchema;
+using System;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using DatabaseSchemaReader.DataSchema;
 
 namespace DatabaseSchemaReader.SqlGen.SqlServer
 {
     class TableGenerator : TableGeneratorBase
     {
         private bool _hasBit;
+        private bool _useGranularBatching;
         protected DataTypeWriter DataTypeWriter;
 
         public TableGenerator(DatabaseTable table)
@@ -19,6 +20,12 @@ namespace DatabaseSchemaReader.SqlGen.SqlServer
                 originSqlType = ProviderToSqlType.Convert(table.DatabaseSchema.Provider);
 
             DataTypeWriter = new DataTypeWriter(originSqlType);
+            SqlFormatProviderInstance = new SqlFormatProvider();
+        }
+        public void UseGranularBatching()
+        {
+            _useGranularBatching = true;
+            SqlFormatProviderInstance = new BatchingSqlFormatProvider();
         }
 
         public override string Write()
@@ -97,7 +104,9 @@ namespace DatabaseSchemaReader.SqlGen.SqlServer
         }
         protected virtual ConstraintWriterBase CreateConstraintWriter()
         {
-            return new ConstraintWriter(Table) { IncludeSchema = IncludeSchema, EscapeNames = EscapeNames};
+            var constraintWriter = new ConstraintWriter(Table) { IncludeSchema = IncludeSchema, EscapeNames = EscapeNames };
+            if (_useGranularBatching) constraintWriter.UseGranularBatching();
+            return constraintWriter;
         }
         protected virtual IMigrationGenerator CreateMigrationGenerator()
         {
@@ -105,6 +114,7 @@ namespace DatabaseSchemaReader.SqlGen.SqlServer
             //ensure we're not writing schema prefixes
             if (!IncludeSchema) migrations.IncludeSchema = false;
             migrations.EscapeNames = EscapeNames;
+            if (_useGranularBatching) migrations.UseGranularBatching();
             return migrations;
         }
 
@@ -136,7 +146,7 @@ namespace DatabaseSchemaReader.SqlGen.SqlServer
 
         protected override ISqlFormatProvider SqlFormatProvider()
         {
-            return new SqlFormatProvider();
+            return SqlFormatProviderInstance;
         }
 
         protected virtual bool HandleComputed(DatabaseColumn column)
